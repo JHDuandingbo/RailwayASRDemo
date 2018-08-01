@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- 上述3个meta标签*必须*放在最前面，任何其他内容都*必须*跟随其后！ -->
+    <title>铁路交通事故(设备故障)概况表</title>
+
+    <!-- Bootstrap -->
+    <link href="https://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.bootcss.com/jquery/1.12.4/jquery.min.js"></script>
+    <!-- 加载 Bootstrap 的所有 JavaScript 插件。你也可以根据需要只加载单个插件。 -->
+    <script src="https://cdn.bootcss.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    <!-- <script type="text/javascript" language="JavaScript" src="https://cdn.jsdelivr.net/binaryjs/0.2.1/binary.min.js"></script> -->
+
+
+
+    <!-- HTML5 shim 和 Respond.js 是为了让 IE8 支持 HTML5 元素和媒体查询（media queries）功能 -->
+    <!-- 警告：通过 file:// 协议（就是直接将 html 页面拖拽到浏览器中）访问页面时 Respond.js 不起作用 -->
+    <!--[if lt IE 9]>
+      <script src="https://cdn.bootcss.com/html5shiv/3.7.3/html5shiv.min.js"></script>
+      <script src="https://cdn.bootcss.com/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+
+    <script>
+        $(function () {
+
+            let currentJtag = ""
+
+            let cnToJtag = {
+                "地点": "address",
+                "公里标": "kilometerPost",
+                "上下行": "lineType",
+                "坡度": "declivity",
+                "曲线半径": "radius",
+                "列车种类": "trainType",
+
+                "车次": "trainNumber", //与耽误车次  有重复
+
+
+                "天气": "weather",
+                "机车": "motor",
+                "补机": "assistingVehicle",
+                "所属段": "motorAttach",
+                "牵引定数": "tonnageRating",
+                "现车": "totalTrain",
+                "计长": "totalLength",
+                "司机": "driver",
+                "副司机": "assistantDriver",
+
+                "列车长": "conductor",//每次都被识别成列车
+                //    "列车": "conductor",
+                //  "列车厂": "conductor",
+
+                //"值班员": "dutyPeople",
+                 "直八幺": "dutyPeople",
+                // "至源": "dutyPeople",
+
+
+                "是否中断正线": "isBreakOffMainLine",
+                "发生时间": "occurrenceTime",
+                "复旧时间": "recoverTime",
+                "开通时间": "openingTime",
+                "耽误货车": "delayFreightTrainTotal",
+                "耽误客车": "delayPassengerTrainTotal",
+                "耽误车次": "delayTrainNumber",
+                //   "原因": "reason",
+                "袁银": "reason",
+
+                // "概况": "overview",
+                "盖阔": "overview",
+                "填报人": "reporter",
+            }
+            function connect() {
+
+                var client;
+                try {
+
+                    client = new WebSocket('ws://58.87.95.166:60001');
+                } catch (e) {
+                    console.log(e)
+                }
+
+                client.binaryType = 'arraybuffer';
+                client.addEventListener('close', function (evt) {
+                    console.log('ws closed');
+                    setTimeout(function () {
+                        connect();
+                    }, 200)
+
+                });
+                client.addEventListener('error', function (evt) {
+                    console.log('ws error '); console.log(evt);
+                    client.close();
+
+                });
+                client.addEventListener('open', function () {
+                    console.log("ws client opened")
+
+                });
+                let dec = new TextDecoder('gbk')
+                client.addEventListener('message', function (evt) {
+
+                    //    console.log(evt.data.byteLength);
+                    //Decode and clean text
+                    //Decode and clean text
+                    //Decode and clean text
+                    var bufView = new Uint8Array(evt.data);
+                    var unis = [];
+                    for (var i = 0; i < bufView.length; i++) {
+                        unis.push(bufView[i]);
+                    }
+                    // let str = String.fromCharCode.apply(null, unis);
+                    let str = dec.decode(bufView);
+                    str = str.replace(/[<>/"}{]/g, '');
+
+                    let pairs = str.split(',');
+                    let text = "";
+                    for (i = 0; i < pairs.length; i++) {
+                        let pair = pairs[i];
+                        let kv = pair.split(":");
+                        if (kv && kv.length == 2) {
+                            text += kv[0]
+                        }
+                    }
+                    text = text.replace(/s/g, '')
+                    console.log(text)
+                    //Parse text
+                    //Parse text
+                    //Parse text
+                    let cns = Object.keys(cnToJtag);
+                    let contentParser = []
+
+                    // cns.forEach(function (cn) {
+                    //     let pos = text.indexOf(cn);
+                    //     if (pos != -1) {
+                    //         let jtag = cnToJtag[cn];
+                    //         contentParser.push({ jtag: jtag, pos: pos, cn: cn });
+                    //     }
+                    // })
+                    //let text = text;
+                    let startPos = -1;
+                    while (true) {
+                        let currentPos = -1;
+                        let currentCn="";
+                        cns.forEach((cn) => {
+                            let pos = text.indexOf(cn, startPos)
+                            if (pos != -1) {
+                                if (currentPos == -1 || pos < currentPos) {
+                                    currentPos = pos;
+                                    currentCn = cn;
+                                }
+
+                            }
+                        })
+                        if(currentPos == -1){
+                            break;
+                        }else{
+                            contentParser.push({jtag:cnToJtag[currentCn], pos:currentPos, cn:currentCn})
+                            startPos=currentPos+ currentCn.length;
+                        }
+                       
+                    }
+                    console.log(contentParser)
+                    // contentParser = contentParser.sort((a, b) => {
+                    //     return a.pos - b.pos;
+                    // });
+                    let len = contentParser.length
+                    if (len > 1) {
+
+                        for (let i = 1; i < contentParser.length; i++) {
+                            let obj = contentParser[i];
+                            let prevObj = contentParser[i - 1];
+                            if (obj.pos - prevObj.pos < prevObj.cn.length) {
+                                obj.invalid = true;
+                            } else {
+                                obj.invalid = false;
+                            }
+
+                        }
+                    }
+                    contentParser = contentParser.filter((obj) => {
+                        return !obj.invalid;
+                    })
+                    console.log(contentParser)
+                    len = contentParser.length
+                    if (len) {
+                        //是否有当前jtag(jqury tag)的剩余部分
+                        if (contentParser[0].pos && currentJtag) {
+                            let $target = $("input[name=" + currentJtag + "]");
+                            let pos = contentParser[0].pos
+                            let content = $target.val() + text.slice(0, pos);
+                            $target.val(content); $target.focus();
+                        }
+                        //设置每个jtag的内容
+                        for (let i = 0; i < len; i++) {
+                            let obj = contentParser[i];
+                            let pos = obj.pos + obj.cn.length;
+                            let content = ""
+                            if (i + 1 < len) {
+                                content = text.slice(pos, contentParser[i + 1].pos)
+                            } else {
+                                content = text.slice(pos);
+                            }
+                            let $target = $("input[name=" + obj.jtag + "]");
+                            $target.val(content); $target.focus();
+
+                        }
+                        currentJtag = contentParser[len - 1].jtag;
+
+                    } else if (currentJtag) {
+                        let $target = $("input[name=" + currentJtag + "]");
+
+                        let content = $target.val() + text;
+                        $target.val(content); $target.focus();
+                        //没有任何jtag，当前内容追加到currentJtag
+
+                    }
+
+
+
+                });
+
+            }
+
+            connect();
+
+            $('#submit').click(function () {
+                let info_all = form2json($("body"))
+                console.log(info_all);
+                $.ajax({
+                    type: "post",
+                    url: "/ssmis_interface/servlet/Ab1HttpServlet",
+                    dataType: "json",
+                    contentType: "application/x-www-form-urlencoded; charset=UTF-8",
+                    data: {
+                        "content": JSON.stringify(info_all)
+                    },
+                    success: function (data, status, xhr) {
+                        if (status == "success") {
+                            alert("提交成功!")
+                        }
+                    },
+                    error: function (e) { },
+                    complete: function () {
+
+                    },
+
+                });
+            })
+
+
+            function form2json($selector) {
+                var obj = {};
+                var $inputs = $selector.find("input[name]");
+
+                $inputs.each(function () {
+
+                    var self = $(this);
+                    var name = self.attr('name');
+                    if (name) {
+
+                        obj[name] = self.val();
+
+                    }
+
+                });
+                return obj;
+            }
+
+
+
+
+        })
+    </script>
+
+</head>
+
+<body>
+    <div class="container-fluid">
+
+        <div class="row">
+            <center>
+                <h1>铁路交通事故(设备故障)概况表</h1>
+            </center>
+            <hr>
+        </div>
+
+
+        <div class="row">
+
+            <div class="col-lg-2 col-lg-offset-1  ">
+                <label for="lastName">地点
+                </label>
+                <input type="text" class="form-control" name="address" placeholder="" value="" required>
+
+            </div>
+            <div class="col-lg-2 col-lg-offset-1  ">
+                <label for="lastName"> 公里标 </label>
+                <input type="text" class="form-control" name="kilometerPost" placeholder="" value="" required>
+
+            </div>
+            <div class="col-lg-2 col-lg-offset-1  ">
+                <label for="lastName"> 上下行</label>
+                <input type="text" class="form-control" name="lineType" placeholder="" value="" required>
+
+            </div>
+
+
+        </div>
+        <div class="row">
+
+            <div class="col-lg-2 col-lg-offset-1  ">
+                <label for="lastName">坡度
+                </label>
+                <input type="text" class="form-control" name="declivity" placeholder="" value="" required>
+
+            </div>
+            <div class="col-lg-2 col-lg-offset-1  ">
+                <label for="lastName"> 曲线半径 </label>
+                <input type="text" class="form-control" name="radius" placeholder="" value="" required>
+
+            </div>
+            <div class="col-lg-2 col-lg-offset-1  ">
+                <label for="lastName"> 列车种类</label>
+                <input type="text" class="form-control" name="trainType" placeholder="" value="" required>
+
+            </div>
+
+
+        </div>
+        <div class="row">
+
+            <div class="col-lg-2 col-lg-offset-1  ">
+                <label for="lastName">车次
+                </label>
+                <input type="text" class="form-control" name="trainNumber" placeholder="" value="" required>
+
+            </div>
+            <div class="col-lg-2 col-lg-offset-1  ">
+                <label for="lastName"> 天气 </label>
+                <input type="text" class="form-control" name="weather" placeholder="" value="" required>
+
+            </div>
+            <div class="col-lg-2 col-lg-offset-1  ">
+                <label for="lastName"> 机车</label>
+                <input type="text" class="form-control" name="motor" placeholder="" value="" required>
+
+            </div>
+
+
+        </div>
+        <div class="row">
+
+            <div class="col-lg-2 col-lg-offset-1  ">
+                <label for="lastName">补机
+                </label>
+                <input type="text" class="form-control" name="assistingVehicle" placeholder="" value="" required>
+
+            </div>
+            <div class="col-lg-2 col-lg-offset-1  ">
+                <label for="lastName"> 所属段 </label>
+                <input type="text" class="form-control" name="motorAttach" placeholder="" value="" required>
+
+            </div>
+            <div class="col-lg-2 col-lg-offset-1  ">
+                <label for="lastName"> 牵引定数</label>
+                <input type="text" class="form-control" name="tonnageRating" placeholder="" value="" required>
+
+            </div>
+
+
+        </div>
+        <div class="row">
+
+            <div class="col-lg-2 col-lg-offset-1  ">
+                <label for="lastName">现车
+                </label>
+                <input type="text" class="form-control" name="totalTrain" placeholder="" value="" required>
+
+            </div>
+            <div class="col-lg-2 col-lg-offset-1  ">
+                <label for="lastName"> 计长 </label>
+                <input type="text" class="form-control" name="totalLength" placeholder="" value="" required>
+
+            </div>
+            <div class="col-lg-2 col-lg-offset-1  ">
+                <label for="lastName"> 司机</label>
+                <input type="text" class="form-control" name="driver" placeholder="" value="" required>
+
+            </div>
+
+
+        </div>
+        <div class="row">
+
+            <div class="col-lg-2 col-lg-offset-1  ">
+                <label for="lastName">副司机
+                </label>
+                <input type="text" class="form-control" name="assistantDriver" placeholder="" value="" required>
+
+            </div>
+            <div class="col-lg-2 col-lg-offset-1  ">
+                <label for="lastName"> 列车长 </label>
+                <input type="text" class="form-control" name="conductor" placeholder="" value="" required>
+
+            </div>
+            <div class="col-lg-2 col-lg-offset-1  ">
+                <label for="lastName"> 值班员</label>
+                <input type="text" class="form-control" name="dutyPeople" placeholder="" value="" required>
+
+            </div>
+
+
+        </div>
+        <div class="row">
+
+            <div class="col-lg-2 col-lg-offset-1  ">
+                <label for="lastName">是否中断正线
+                </label>
+                <input type="text" class="form-control" name="isBreakOffMainLine" placeholder="" value="" required>
+
+            </div>
+            <div class="col-lg-2 col-lg-offset-1  ">
+                <label for="lastName"> 发生时间 </label>
+                <input type="text" class="form-control" name="occurrenceTime" placeholder="" value="" required>
+
+            </div>
+            <div class="col-lg-2 col-lg-offset-1  ">
+                <label for="lastName"> 复旧时间</label>
+                <input type="text" class="form-control" name="recoverTime" placeholder="" value="" required>
+
+            </div>
+
+
+        </div>
+        <div class="row">
+
+            <div class="col-lg-2 col-lg-offset-1  ">
+                <label for="lastName">开通时间
+                </label>
+                <input type="text" class="form-control" name="openingTime" placeholder="" value="" required>
+
+            </div>
+            <div class="col-lg-2 col-lg-offset-1  ">
+                <label for="lastName"> 耽误客车 </label>
+                <input type="text" class="form-control" name="delayPassengerTrainTotal" placeholder="" value="" required>
+
+            </div>
+            <div class="col-lg-2 col-lg-offset-1  ">
+                <label for="lastName"> 耽误货车</label>
+                <input type="text" class="form-control" name="delayFreightTrainTotal" placeholder="" value="" required>
+
+            </div>
+
+
+        </div>
+        <div class="row">
+
+            <div class="col-lg-10 col-lg-offset-1  ">
+                <label for="lastName">耽误车次
+                </label>
+                <input type="text" class="form-control" name="delayTrainNumber" placeholder="" value="" required>
+
+            </div>
+
+
+
+        </div>
+        <div class="row">
+
+            <div class="col-lg-10 col-lg-offset-1  ">
+                <label for="lastName">原因
+                </label>
+                <input type="text" class="form-control" name="reason" placeholder="" value="" required>
+
+            </div>
+
+
+
+        </div>
+        <div class="row">
+
+            <div class="col-lg-10 col-lg-offset-1  ">
+                <label for="lastName">概况
+                </label>
+                <input type="text" class="form-control" name="overview" placeholder="" value="" required>
+
+            </div>
+
+
+
+        </div>
+        <div class="row">
+
+            <div class="col-lg-10 col-lg-offset-1  ">
+                <label for="lastName">填报人
+                </label>
+                <input type="text" class="form-control" name="reporter" id="reporter" placeholder="" value="" required>
+
+            </div>
+
+
+
+        </div>
+
+        <div class="row" style="margin:10px">
+        </div>
+        <div class="row">
+
+            <div class="col-lg-1 col-lg-offset-4  ">
+                <button class="btn btn-primary" id="start">
+                    开始录音
+                </button>
+
+            </div>
+            <div class="col-lg-1 col-lg-offset-2  ">
+                <button type="button" class="btn btn-success" id="submit">
+                    提交
+                </button>
+            </div>
+
+
+
+        </div>
+
+
+
+
+
+    </div>
+</body>
+
+</html>
